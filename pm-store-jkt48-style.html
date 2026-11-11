@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PM Store</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{box-sizing:border-box} body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}
+    button,input,textarea{font:inherit}.app{max-width:1100px;margin:auto;min-height:100vh;background:white}
+    header{height:64px;background:#111827;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 18px;position:sticky;top:0;z-index:5}
+    .brand{font-weight:800;font-size:20px}.owner-badge{background:#fbbf24;color:#111827;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:bold}
+    .layout{display:grid;grid-template-columns:320px 1fr;min-height:calc(100vh - 64px)}
+    .sidebar{border-right:1px solid #e5e7eb;background:#fff}.sidebar-top{padding:14px;border-bottom:1px solid #e5e7eb}
+    .member{display:flex;gap:12px;padding:13px 14px;border-bottom:1px solid #f1f5f9;cursor:pointer}.member:hover,.member.active{background:#f3f4f6}
+    .avatar{width:46px;height:46px;border-radius:50%;background:#d1d5db;object-fit:cover;flex:none}.member-name{font-weight:700}.small{font-size:12px;color:#6b7280}
+    .chat{display:flex;flex-direction:column;background:#f8fafc}.chat-head{padding:14px 18px;background:#fff;border-bottom:1px solid #e5e7eb;font-weight:bold}
+    #messages{padding:20px;display:flex;flex-direction:column;gap:12px;overflow:auto;flex:1}.bubble{max-width:78%;background:white;padding:12px 14px;border-radius:16px;border:1px solid #e5e7eb;box-shadow:0 1px 2px #00000008}.bubble img{max-width:100%;border-radius:10px;margin-top:8px}.time{font-size:11px;color:#9ca3af;margin-top:6px}
+    .empty{margin:auto;color:#6b7280;text-align:center}.auth{max-width:420px;margin:55px auto;padding:24px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:20px;box-shadow:0 10px 30px #0000000d}
+    input,textarea{width:100%;padding:11px;border:1px solid #d1d5db;border-radius:9px;margin:6px 0 12px}textarea{min-height:80px;resize:vertical}
+    button{border:0;border-radius:9px;padding:10px 14px;background:#111827;color:#fff;cursor:pointer}button.secondary{background:#e5e7eb;color:#111827}button.danger{background:#dc2626}.row{display:flex;gap:8px;align-items:center}.row.wrap{flex-wrap:wrap}
+    .owner-panel{padding:20px;max-width:900px;margin:auto}.tabs{display:flex;gap:8px;margin-bottom:15px}.hidden{display:none!important}.notice{padding:10px;border-radius:8px;background:#fef3c7;color:#92400e;margin:10px 0}
+    .auth-links{margin-top:10px;text-align:center}.loading{padding:20px;color:#6b7280}
+    @media(max-width:700px){.layout{grid-template-columns:1fr}.sidebar{border-right:0}.chat{display:none}.layout.chat-open .sidebar{display:none}.layout.chat-open .chat{display:flex}.back{display:inline-block!important}.owner-panel{padding:14px}}
+    .back{display:none}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">💬 PM STORE</div>
+    <div class="row">
+      <span id="userLabel" class="small" style="color:#d1d5db"></span>
+      <span id="ownerBadge" class="owner-badge hidden">👑 OWNER</span>
+      <button id="ownerBtn" class="secondary hidden">Panel Owner</button>
+      <button id="logoutBtn" class="secondary hidden">Logout</button>
+    </div>
+  </header>
+
+  <section id="authView" class="auth">
+    <div class="card">
+      <h2 id="authTitle">Masuk ke PM Store</h2>
+      <div id="authNotice"></div>
+      <input id="email" type="email" placeholder="Email" />
+      <input id="password" type="password" placeholder="Password" />
+      <button id="loginBtn" style="width:100%">Login</button>
+      <button id="registerBtn" class="secondary" style="width:100%;margin-top:8px">Daftar Akun Baru</button>
+      <div class="auth-links small">Gunakan email Owner yang sudah memiliki role <b>owner</b> untuk membuka Panel Owner.</div>
+    </div>
+  </section>
+
+  <main id="mainView" class="layout hidden">
+    <aside class="sidebar">
+      <div class="sidebar-top"><b>Member</b><div class="small">Pilih member untuk membuka PM</div></div>
+      <div id="memberList" class="loading">Memuat member...</div>
+    </aside>
+    <section class="chat">
+      <div id="chatHead" class="chat-head"><button class="secondary back" onclick="closeChat()">← Kembali</button> Pilih member</div>
+      <div id="messages"><div class="empty">Pilih member untuk melihat pesan.</div></div>
+    </section>
+  </main>
+
+  <section id="ownerView" class="owner-panel hidden">
+    <button id="backAppBtn" class="secondary">← Kembali ke PM</button>
+    <h2>👑 Panel Owner</h2>
+    <div class="notice">Akses panel ditentukan oleh <code>profiles.role = 'owner'</code>.</div>
+    <div class="tabs">
+      <button id="tabMembers">Kelola Member</button>
+      <button id="tabMessages" class="secondary">Tambah Pesan</button>
+    </div>
+
+    <div id="membersPanel" class="card">
+      <h3>Tambah Member</h3>
+      <input id="memberName" placeholder="Nama member" />
+      <input id="memberUsername" placeholder="Username sumber (opsional)" />
+      <input id="memberAvatar" placeholder="URL foto profil (opsional)" />
+      <input id="memberSource" placeholder="URL sumber publik (opsional)" />
+      <button id="addMemberBtn">Tambah Member</button>
+      <div id="ownerMemberList" style="margin-top:18px"></div>
+    </div>
+
+    <div id="messagesPanel" class="card hidden">
+      <h3>Tambah Pesan Manual</h3>
+      <select id="messageMember" style="width:100%;padding:11px;margin:6px 0 12px"></select>
+      <textarea id="messageText" placeholder="Isi pesan"></textarea>
+      <input id="messageMedia" placeholder="URL foto/media (opsional)" />
+      <button id="addMessageBtn">Kirim ke PM</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const SUPABASE_URL = "https://cofxnllkqkcovoijilby.supabase.co";
+const SUPABASE_KEY = "sb_publishable_XyMlx4oiEr2j7E9QrjX-PA_TwErTpaB";
+const OWNER_EMAIL = "raduoky283@gmail.com";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let currentUser = null, currentMember = null, isOwner = false;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+
+function notice(text, error=false){
+  $("authNotice").innerHTML = text ? `<div class="notice" style="${error?'background:#fee2e2;color:#991b1b':''}">${esc(text)}</div>` : "";
+}
+
+async function checkOwner(){
+  isOwner = false;
+  if(!currentUser) return;
+  const {data, error} = await sb.from("profiles").select("role").eq("id", currentUser.id).maybeSingle();
+  if(!error && data?.role === "owner") isOwner = true;
+  // Email hanya untuk label cadangan, akses tetap role database.
+  $("ownerBadge").classList.toggle("hidden", !isOwner);
+  $("ownerBtn").classList.toggle("hidden", !isOwner);
+}
+
+async function loadMembers(){
+  const {data, error} = await sb.from("pm_members").select("*").eq("active", true).order("created_at",{ascending:false});
+  if(error){ $("memberList").innerHTML = `<div class="notice">Gagal memuat member: ${esc(error.message)}</div>`; return; }
+  $("memberList").innerHTML = data.length ? data.map(m=>`
+    <div class="member" data-id="${m.id}">
+      <img class="avatar" src="${esc(m.avatar_url || "https://placehold.co/92x92?text=PM")}" onerror="this.src='https://placehold.co/92x92?text=PM'">
+      <div><div class="member-name">${esc(m.name)}</div><div class="small">@${esc(m.username || "member")}</div></div>
+    </div>`).join("") : `<div class="empty" style="padding:20px">Belum ada member.</div>`;
+  document.querySelectorAll(".member").forEach(el=>el.onclick=()=>openMember(data.find(x=>x.id===el.dataset.id)));
+  if(isOwner) await loadOwnerMemberList();
+  fillMemberSelect(data);
+}
+
+function fillMemberSelect(data){
+  $("messageMember").innerHTML = `<option value="">Pilih member</option>` + data.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("");
+}
+
+async function openMember(member){
+  currentMember = member;
+  $("chatHead").innerHTML = `<button class="secondary back" onclick="closeChat()">← Kembali</button> 💬 ${esc(member.name)}`;
+  document.querySelectorAll(".member").forEach(x=>x.classList.toggle("active",x.dataset.id===member.id));
+  $("mainView").classList.add("chat-open");
+  await loadMessages();
+}
+
+function closeChat(){ $("mainView").classList.remove("chat-open"); }
+
+async function loadMessages(){
+  if(!currentMember) return;
+  $("messages").innerHTML = `<div class="loading">Memuat pesan...</div>`;
+  const {data,error} = await sb.from("pm_messages").select("*").eq("member_id",currentMember.id).order("posted_at",{ascending:true});
+  if(error){ $("messages").innerHTML=`<div class="notice">Gagal memuat pesan: ${esc(error.message)}</div>`; return; }
+  $("messages").innerHTML = data.length ? data.map(renderMessage).join("") : `<div class="empty">Belum ada pesan.</div>`;
+  $("messages").scrollTop = $("messages").scrollHeight;
+}
+
+function renderMessage(m){
+  const date = m.posted_at || m.created_at;
+  const media = m.media_url ? `<img src="${esc(m.media_url)}" alt="Media pesan">` : "";
+  return `<div class="bubble" data-message="${m.id}"><div>${esc(m.message || "")}</div>${media}<div class="time">${date ? new Date(date).toLocaleString("id-ID") : ""}</div></div>`;
+}
+
+function addRealtimeMessage(m){
+  if(currentMember && m.member_id === currentMember.id){
+    if(!document.querySelector(`[data-message="${m.id}"]`)){
+      if($("messages").querySelector(".empty")) $("messages").innerHTML="";
+      $("messages").insertAdjacentHTML("beforeend",renderMessage(m));
+      $("messages").scrollTop=$("messages").scrollHeight;
+    }
+  }
+}
+
+async function loadOwnerMemberList(){
+  const {data,error} = await sb.from("pm_members").select("*").order("created_at",{ascending:false});
+  if(error) return;
+  $("ownerMemberList").innerHTML = `<h3>Daftar Member</h3>` + data.map(m=>`
+    <div class="row wrap" style="padding:9px 0;border-bottom:1px solid #eee">
+      <b>${esc(m.name)}</b><span class="small">${m.active?"Aktif":"Nonaktif"}</span>
+      <button class="secondary" onclick="toggleMember('${m.id}',${!m.active})">${m.active?"Nonaktifkan":"Aktifkan"}</button>
+    </div>`).join("");
+}
+
+window.toggleMember = async (id, active) => {
+  const {error}=await sb.from("pm_members").update({active}).eq("id",id);
+  if(error) alert(error.message); else loadMembers();
+};
+
+$("loginBtn").onclick = async ()=>{
+  notice("");
+  const {error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
+  if(error) notice(error.message,true);
+};
+
+$("registerBtn").onclick = async ()=>{
+  notice("");
+  const {data,error}=await sb.auth.signUp({email:$("email").value.trim(),password:$("password").value});
+  if(error) notice(error.message,true);
+  else notice(data.session ? "Akun berhasil dibuat dan login." : "Akun dibuat. Periksa email untuk verifikasi.");
+};
+
+$("logoutBtn").onclick = async ()=>{ await sb.auth.signOut(); };
+
+$("ownerBtn").onclick = ()=>{ $("mainView").classList.add("hidden"); $("ownerView").classList.remove("hidden"); };
+$("backAppBtn").onclick = ()=>{ $("ownerView").classList.add("hidden"); $("mainView").classList.remove("hidden"); };
+
+$("tabMembers").onclick=()=>{ $("membersPanel").classList.remove("hidden");$("messagesPanel").classList.add("hidden"); };
+$("tabMessages").onclick=()=>{ $("messagesPanel").classList.remove("hidden");$("membersPanel").classList.add("hidden"); };
+
+$("addMemberBtn").onclick = async ()=>{
+  const name=$("memberName").value.trim();
+  if(!name) return alert("Nama member wajib diisi.");
+  const payload={
+    name,
+    username:$("memberUsername").value.trim()||null,
+    avatar_url:$("memberAvatar").value.trim()||null,
+    source_url:$("memberSource").value.trim()||null
+  };
+  const {error}=await sb.from("pm_members").insert(payload);
+  if(error) alert(error.message);
+  else { ["memberName","memberUsername","memberAvatar","memberSource"].forEach(id=>$(id).value=""); await loadMembers(); alert("Member berhasil ditambahkan."); }
+};
+
+$("addMessageBtn").onclick = async ()=>{
+  const member_id=$("messageMember").value;
+  if(!member_id) return alert("Pilih member.");
+  const {error}=await sb.from("pm_messages").insert({
+    member_id,
+    message:$("messageText").value.trim()||null,
+    media_url:$("messageMedia").value.trim()||null,
+    media_type:$("messageMedia").value.trim()?"image":null,
+    posted_at:new Date().toISOString()
+  });
+  if(error) alert(error.message);
+  else { $("messageText").value=""; $("messageMedia").value=""; alert("Pesan berhasil ditambahkan."); }
+};
+
+async function updateUI(){
+  const {data:{user}}=await sb.auth.getUser();
+  currentUser=user;
+  $("authView").classList.toggle("hidden",!!user);
+  $("mainView").classList.toggle("hidden",!user);
+  $("logoutBtn").classList.toggle("hidden",!user);
+  $("userLabel").textContent=user?.email||"";
+  if(user){ await checkOwner(); await loadMembers(); }
+  else { $("ownerView").classList.add("hidden"); $("mainView").classList.add("hidden"); }
+}
+
+sb.auth.onAuthStateChange(()=>setTimeout(updateUI,0));
+
+sb.channel("pm-store-realtime")
+  .on("postgres_changes",{event:"INSERT",schema:"public",table:"pm_messages"},payload=>addRealtimeMessage(payload.new))
+  .on("postgres_changes",{event:"*",schema:"public",table:"pm_members"},()=>loadMembers())
+  .subscribe();
+
+updateUI();
+</script>
+</body>
+</html>
